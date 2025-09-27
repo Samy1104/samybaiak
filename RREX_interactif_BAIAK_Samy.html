@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booting Stage Assistant v1.0...</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-glow: #00BFFF;
+            --secondary-glow: #8A2BE2;
+            --text-color: #EAEAEA;
+            --bg-color: #020412;
+            --panel-bg: rgba(15, 25, 45, 0.5);
+            --border-color: rgba(0, 191, 255, 0.3);
+        }
+        
+        body {
+            font-family: 'Montserrat', sans-serif; margin: 0; padding: 0; color: var(--text-color);
+            background-color: var(--bg-color); overflow-x: hidden; transition: opacity 1s;
+        }
+
+        .theme-stealth {
+            --primary-glow: #4a90e2; --secondary-glow: #6f42c1;
+            --border-color: rgba(74, 144, 226, 0.3);
+        }
+        .theme-glitch .window-header { animation: glitch 1.5s linear infinite; }
+        
+        @keyframes glitch {
+            2%,64%{ transform: translate(2px,0) skew(0deg); } 4%,60%{ transform: translate(-2px,0) skew(0deg); }
+            62%{ transform: translate(0,0) skew(5deg); }
+        }
+
+        #background-fx, #matrix-canvas { position: fixed; inset: 0; z-index: -1; }
+        #background-fx {
+            background-image: url('https://i.ibb.co/3s6wXvj/cegid-background.png');
+            background-size: cover; background-position: center; animation: fadeInBg 2s ease-in-out forwards 4.5s;
+            opacity: 0;
+        }
+        #background-fx::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle, transparent, rgba(2,4,18,0.8)); }
+        @keyframes fadeInBg { to { opacity: 0.7; } }
+        #matrix-canvas { display: none; }
+
+        #boot-screen {
+            position: fixed; inset: 0; background: #000; color: #00FF41;
+            font-family: 'Source Code Pro', monospace; z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+            transition: opacity 1s ease-out 0.5s; padding: 20px; box-sizing: border-box;
+        }
+        #boot-screen.hidden { opacity: 0; pointer-events: none; }
+        #boot-text { white-space: pre; font-size: 1.1em; }
+        .boot-line { opacity: 0; }
+        
+        main { padding: 50px 50px 250px 50px; }
+
+        .content-window {
+            background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px;
+            backdrop-filter: blur(15px); box-shadow: 0 10px 40px rgba(0,0,0,0.5), inset 0 0 0 1px var(--border-color);
+            margin-bottom: 50px; scroll-margin-top: 50px; transition: box-shadow 0.4s;
+        }
+        .window-header {
+            display: flex; align-items: center; padding: 15px 25px; border-bottom: 1px solid var(--border-color);
+            background: rgba(0,0,0,0.2); border-radius: 12px 12px 0 0;
+        }
+        .window-header h2 {
+            font-family: 'Montserrat', sans-serif; margin: 0; font-size: 1.8em; color: #fff;
+            text-shadow: 0 0 10px var(--primary-glow), 0 0 20px var(--primary-glow);
+            transition: text-shadow 0.4s;
+        }
+        .window-body { padding: 30px; font-size: 1.1em; line-height: 1.8; }
+        .window-body h3 {
+            font-size: 1.4em; color: var(--primary-glow); text-transform: uppercase;
+            border-bottom: 1px solid var(--border-color); padding-bottom: 10px; transition: color 0.4s, border-color 0.4s; margin-top: 30px;
+        }
+
+        .highlight { background-color: rgba(0, 191, 255, 0.4); box-shadow: 0 0 10px var(--primary-glow); border-radius: 3px; }
+        
+        #chatbot-container {
+            position: fixed; bottom: 0; left: 0; right: 0; height: 220px;
+            background: rgba(10, 15, 30, 0.8); backdrop-filter: blur(15px);
+            border-top: 1px solid var(--border-color); box-shadow: 0 0 30px rgba(0, 191, 255, 0.3);
+            display: flex; flex-direction: column; padding: 10px; box-sizing: border-box;
+            opacity: 0; transition: opacity 1s, box-shadow 0.4s;
+        }
+        #chat-log { flex-grow: 1; overflow-y: auto; font-family: 'Source Code Pro', monospace; padding: 10px; }
+        .chat-message { margin-bottom: 10px; }
+        .bot-message .message-content { color: var(--text-color); }
+        .user-message .message-content { color: var(--primary-glow); }
+        .chat-options { margin-top: 5px; }
+        .chat-button {
+            background: transparent; border: 1px solid var(--primary-glow); color: var(--primary-glow);
+            padding: 5px 12px; margin: 0 10px 5px 0; cursor: pointer; border-radius: 4px;
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+        .chat-button:hover { background: rgba(0, 191, 255, 0.2); box-shadow: 0 0 10px var(--primary-glow); }
+        .chat-input-area { display: flex; align-items: center; padding-top: 10px; border-top: 1px solid var(--border-color); }
+        .prompt { color: var(--primary-glow); font-family: 'Source Code Pro', monospace; font-size: 1.2em; }
+        #chat-input {
+            flex-grow: 1; background: transparent; border: none; color: #fff;
+            font-family: 'Source Code Pro', monospace; font-size: 1.2em; padding: 5px; outline: none;
+        }
+        ul, ol { padding-left: 20px; }
+        li { margin-bottom: 10px; }
+        blockquote { font-family: 'Source Code Pro', monospace; margin-left: 20px; padding: 10px; border-left: 3px solid var(--secondary-glow); background: rgba(0,0,0,0.2); }
+    </style>
+</head>
+<body>
+    <div id="background-fx"></div>
+    <canvas id="matrix-canvas"></canvas>
+
+    <audio id="bg-hum" src="https://www.myinstants.com/media/sounds/data-center-hum.mp3" loop></audio>
+    <audio id="typing-sound" src="https://www.myinstants.com/media/sounds/fast-keyboard-typing.mp3"></audio>
+    <audio id="scroll-sound" src="https://www.myinstants.com/media/sounds/deep-glitch-2-short.mp3"></audio>
+    <audio id="confirm-sound" src="https://www.myinstants.com/media/sounds/windows-xp-hardware-insert.mp3"></audio>
+    
+    <div id="boot-screen"><div id="boot-text"></div></div>
+
+    <main id="main-content">
+        <section id="remerciements" class="content-window">
+            <div class="window-header"><h2>// MODULE: REMERCIEMENTS</h2></div>
+            <div class="window-body">
+                <p>Je tiens tout d’abord à exprimer ma gratitude à Grégory DESMOT, mon tuteur de stage, pour l’opportunité qu’il m’a offerte de rejoindre Cegid, ainsi que pour son accompagnement constant, sa disponibilité et son rôle déterminant dans la réussite de cette expérience. Par son appui et ses conseils, il m’a permis de progresser sereinement dans un environnement exigeant et complexe.</p>
+                <p>Mes remerciements s’adressent également à Léa AGOSTI, Head of Marketing, pour la confiance qu’elle m’a accordée, pour la vision stratégique qu’elle a constamment partagée avec moi et pour l’attention qu’elle a portée à l’avancement de mon projet, et ce, bien que son domaine d’expertise soit éloigné de la source de mon projet.</p>
+                <p>Je souhaite aussi remercier chaleureusement Tamara CAPDUPUY, VP Customer Marketing, pour son accueil dès mon premier jour à Boulogne et pour le soin qu’elle a pris à me guider et à faciliter mon intégration au sein de l’entreprise. Sa sympathie ainsi que celle de son équipe ont grandement contribué à rendre mon stage enrichissant et agréable.</p>
+                <p>Enfin, je remercie toutes les personnes de Cegid avec qui j’ai eu l’occasion de collaborer, de près ou de loin, en présentiel ou par visioconférence. Chacun, à sa manière, a participé à faire de ce stage une expérience formatrice et marquante, tant sur le plan professionnel que personnel.</p>
+            </div>
+        </section>
+
+        <section id="introduction" class="content-window">
+            <div class="window-header"><h2>// MODULE: INTRODUCTION</h2></div>
+            <div class="window-body">
+                 <h3>Contexte d’installation</h3>
+                <p>Le module Stage Assistant v1.0 a été déployé au sein du siège de Cegid, à Boulogne-Billancourt, du 1er juillet au 1er août 2025. Pour donner du contexte, Cegid constitue aujourd’hui un acteur majeur de l’édition de logiciels de gestion en France et à l’international. L’entreprise propose une large gamme de solutions couvrant la comptabilité, la paie, la gestion des ressources humaines, la fiscalité, mais aussi des outils de pilotage dédiés aux experts-comptables et aux directions financières.</p>
+                <p>Forte de ses 750 000 clients et plus de 5000 collaborateurs, Cegid tient une place de leader historique dans son domaine, qui peut vite se transformer en rôle de “dinosaure” dépassé par les nouvelles technologies et plans d’action marketing que peuvent adopter certains de ses concurrents, à l’image de Sage et Pennylane. Il n’en demeure pas moins vrai que l’expertise et la qualité de service de Cegid lui assure une base solide de clients malgré le “churn” (indicateur de performance mesurant la proportion de clients perdus) qu’ont provoqué ces concurrents nouvelle génération. Présente sur plusieurs sites (notamment Lyon, Boulogne et Lisbonne au sein desquels j’ai eu l’occasion d’avoir des interactions avec les employés qui y travaillent), l’entreprise se distingue par sa taille, son ancienneté et sa structuration complexe, qui en font à la fois une organisation solide et un environnement riche en apprentissages.</p>
+                <p>Mon arrivée a coïncidé avec un moment fort pour l’entreprise : Mon premier jour s’est déroulé en plein cœur de Paris, à Station F, lors de la tenue de la keynote annuelle, au cours de laquelle Cegid a annoncé une nouvelle gamme de produits nommés BIM! orientés vers l’innovation et l’intégration de l’IA, dans le but de faciliter les activités comptables des TPE-PME. Ce contexte particulier a façonné directement ma mission et m’a permis de travailler dans une dynamique tournée vers la modernisation des pratiques.</p>
+                <h3>Prérequis système</h3>
+                <p>Le projet confié nécessitait un ensemble de prérequis, à la fois techniques et organisationnels. Sur le plan personnel, je disposais déjà de compétences en développement et d’un intérêt marqué pour l’intelligence artificielle et le design, acquis au fil de ma formation à Télécom SudParis et de mes expériences précédentes. Du côté de l’entreprise, l’environnement de travail reposait sur un poste en open space au siège de Boulogne, ainsi qu’un accès aux différents outils de communication utilisés par l’entreprise. Enfin, le fonctionnement multi-sites de Cegid impliquait que les échanges se déroulent majoritairement à distance, ce qui constitue une modalité de communication standard dans l’entreprise, bien que les bâtiments soient équipés de nombreuses salles de réunion en présentiel.</p>
+                <h3>Objectif du logiciel</h3>
+                <p>La mission principale assignée à mon stage consistait à concevoir un outil destiné à accompagner les Product Sales Managers (PSM). Il devait leur permettre de recommander, de manière pertinente et personnalisée, les produits les plus adaptés aux clients de leurs experts-comptables (CPA). L’enjeu ne se limitait pas à l’aspect technique : il s’agissait de renforcer la relation de confiance entre PSM et CPA, afin de favoriser le taux de conversion commerciale de ces interactions. Afin d’atteindre cet objectif, l’outil se devait d’être basé sur l’IA, ainsi que d’être doté d’une interface conversationnelle (chatbot) afin de faciliter l’utilisation. Ce projet s’inscrivait donc à la croisée des préoccupations technologiques, organisationnelles et stratégiques de Cegid , tout en étant soumis à des contraintes fortes en matière de confidentialité et de gestion des accès aux données qui seront exposées tout au long de ce manuel.</p>
+                <h3>Annonce de la structure</h3>
+                <p>Le présent rapport a pour objectif de restituer cette expérience de manière analytique et réflexive, tout en adoptant un format original inspiré du manuel utilisateur. Il a pour objectif de donner toutes les clés pour comprendre les différents points de mon expérience humaine au sein de l’entreprise, ainsi que le processus de création de mon outil durant ce mois. Chaque chapitre se veut être une “fonction” ou un “module” de ce stage, depuis l’organisation humaine jusqu’aux apprentissages techniques et personnels, en passant par les circuits de communication et la culture d’entreprise, et en concluant avec une ouverture et une analyse post-stage sur ce qui aurait pu mieux se dérouler.</p>
+                <p>Ce choix de forme permet de refléter à la fois la nature de mon projet et l’environnement logiciel dans lequel il s'inscrit, et d’insister sur une vision complémentaire entre l’humain et l’outil car les expériences en sont tout aussi riches et liées, le tout en respectant la structure académique attendue.</p>
+            </div>
+        </section>
+        
+        <section id="chapitre1" class="content-window">
+           <div class="window-header"><h2>// CHAPITRE 1: ORGANISATION</h2></div>
+           <div class="window-body">
+                <h3>1.1. Modules activés</h3>
+                <p>Dès le lancement du stage, il est apparu que ma mission ne consistait pas uniquement à de l’observation, mais surtout à la réalisation d’un projet impliquant que je ne pouvais pas me limiter à un seul périmètre fonctionnel, et que je devais mettre la prise d’initiative au cœur de mon processus de réflexion. Le premier jour en fût la confirmation : faire partie du plus gros événement de l’année et de l’annonce des nouveaux produits, et ce dans le but d’engranger un maximum d’information sur l’univers Cegid, ses valeurs, ses techniques de communication et les produits futurs. Mon rôle s’est ainsi défini en transversalité : un “électron libre” naviguant entre plusieurs modules organisationnels.</p>
+                <p>Trois modules principaux se sont rapidement imposés comme essentiels lors de mes échanges :</p>
+                <ul>
+                    <li>Module data : la donnée pure est la pièce maîtresse dans la réalisation de mon projet. Le conseil et la précision de ce dernier sont au cœur même de la réalisation du projet, que ce soit afin d’appréhender Databricks qui est le logiciel utilisé par Cegid pour leur système SaaS (Software as a Service : modèle de distribution de logiciel où l’application n’est pas installée sur l’ordinateur de l’utilisateur, mais hébergée sur le cloud de l’entreprise), ce qui implique que la donnée était techniquement accessible, tout en étant la plus protégée par des conditions d’accès strictes, ce qui m'amène sur mon prochain point.</li>
+                    <li>Module juridique : incontournable pour valider les aspects liés à la confidentialité, le juridique incarnait une étape de validation obligatoire, mais surtout complexe, à l’image d'une “clé d’activation” nécessaire avant tout déploiement.</li>
+                    <li>Module marketing : central pour aligner mon outil avec la stratégie annoncée lors de la keynote, ce dernier devant accompagner le lancement de ces derniers et leur vente. À travers ce module, j’ai pu bénéficier, grâce à un accompagnement constant de la Head of Marketing, Léa AGOSTI, d’une vision, même approximative, sur les orientations produits, car totalement nouvelles et en cours de décision de l’entreprise.</li>
+                </ul>
+                <h3>1.2. Super-admins et droits d’accès</h3>
+                <p>Dans un système logiciel, certains profils disposent de privilèges spécifiques leur permettant de gérer les droits d’accès ou de débloquer des fonctionnalités. Dans mon cas, deux personnes ont joué ce rôle de “super-admins” :</p>
+                <ul>
+                    <li>Grégory DESMOT, mon tuteur de stage mais aussi directeur du portail collaboratif (plateforme en ligne centrale qui permet aux clients de centraliser leurs échanges et leurs documents) : sa position de membre du comité exécutif dans l’entreprise m’a conféré la légitimité nécessaire pour obtenir des réponses rapides et accéder à certaines informations sensibles, tout en ayant une vision très large sur la vision, les mécanismes de fonctionnement ainsi que l’organigramme de cette dernière. Son appui a agi comme une élévation temporaire de privilèges, et un catalyseur : chaque fois que je butais sur un verrou administratif ou organisationnel, son intervention m’aidait à progresser, tout en me faisant gagner du temps.</li>
+                    <li>Léa AGOSTI, Head of Marketing (ou responsable marketing opérationnel) : par sa posture de leader de la vision stratégique du marketing de l’entreprise, de son accompagnement constant, ainsi que de sa disponibilité,  elle m’a aidé à comprendre les enjeux des nouveaux produits, de les cartographier pour décider de l’arbre de recommandation de mon outil, ainsi que de réfléchir à une autre fonctionnalité à ce dernier, le tout pour comprendre comment mon projet s’inscrivait dans les orientations produits de Cegid. Son rôle a été essentiel, puisqu’il consistait à garantir l’alignement de mon outil avec les enjeux commerciaux et marketing de l’entreprise.</li>
+                </ul>
+                <p>L’existence du soutien de personnes aussi influentes m’a fait prendre conscience d’une réalité fondamentale : dans une grande organisation, la réussite d’un projet ne dépend pas uniquement de compétences techniques, mais aussi de la capacité à obtenir le parrainage de figures influentes.</p>
+                <h3>1.3. Expérience utilisateur (intégration et relations)</h3>
+                <p>Sur le plan humain, mon intégration fût particulièrement positive et facile. J’ai été accueilli avec bienveillance par les différentes personnes et équipes que j’ai sollicitées, et j’ai pu constater que ma posture proactive facilitait les échanges et l’accès à l’information. En effet, être sociable, ne pas hésiter à solliciter des rendez-vous et oser poser des questions, même à des personnes occupant des postes élevés, ont constitué de véritables accélérateurs d’intégration, surtout lorsque dans le contexte de mon projet, j’en étais le maître d'œuvre.</p>
+                <p>Cependant, cette expérience utilisateur n’aurait pas été la même sans le soutien de mes “super-admins”. À plusieurs reprises, j’ai pu mesurer que ma seule parole, en tant que stagiaire, n’aurait pas eu le même poids. Leur appui fonctionnait comme une authentification supplémentaire : leur recommandation légitimait mes démarches et me permettait d’obtenir des réponses plus rapides et des rendez-vous surtout au début du stage lors des premières interactions avec de nouvelles personnes.</p>
+                <p>Cette dynamique a renforcé mon sentiment d’appartenance, malgré l’absence d’intégration formelle dans une équipe spécifique. Je n’étais pas simplement un observateur : mon rôle était reconnu, validé et intégré dans un projet d’innovation concret lui-même imaginé par Grégory.</p>
+                <h3>1.4. Analyse réflexive</h3>
+                <p>L’expérience de navigation entre ces différents modules m’a conduit à plusieurs constats. Tout d’abord, j’ai pu constater à quel point la transversalité peut constituer une force pour un stagiaire : en n’étant pas limité à un seul service, j’ai eu l’opportunité de comprendre des logiques variées (technique, juridique, marketing) et d’appréhender les interactions qui les relient, point qui est absolument essentiel si l’on dirige entièrement un projet.</p>
+                <p>Ensuite, j’ai découvert la complexité de ce qui est communément appelé à Cegid des “liens hiérarchiques en pointillés”, qui caractérisent une grande partie de l’organisation maillée de l’entreprise. Ces liens illustrent la pluralité des rattachements et l’importance d’une coordination permanente entre services, mais ils peuvent aussi générer des lenteurs et des incertitudes. Je peux citer l’exemple de Tamara CAPDUPUY, qui m’a accueilli le deuxième jour car mon tuteur était en déplacement exceptionnel, dont l’intitulé de poste est VP Customer Marketing, mais qui était “reliée en pointillé” à mon tuteur car des situations se présentent qui nécessitent une collaboration.</p>
+                <p>Enfin, j’ai été témoin d’un contexte particulier : celui d’une restructuration interne. Ce processus, courant dans les grandes organisations, visait à redéfinir certains pôles et à réorganiser les responsabilités entre les équipes. Concrètement, cette période s’est traduite par des incertitudes, des ajustements en cours et parfois un manque de clarté dans la répartition des rôles. Cette situation a naturellement créé certaines tensions et ralenti certaines collaborations, car les priorités individuelles et collectives n’étaient pas toujours parfaitement alignées.</p>
+                <p>J’ai aussi observé un phénomène courant dans les grandes entreprises : des logiques politiques où certains collaborateurs agissaient autant pour défendre leur position ou leur visibilité que pour atteindre les objectifs collectifs, ce qui compliquait parfois la fluidité des décisions, non pas à mon échelle, mais au niveau de collègues que je côtoyais et avec qui j’ai eu l’occasion d’échanger dans un cadre autre que celui de mon projet.</p>
+                <p>Si ces dimensions sont restées secondaires pour l’avancée directe de mon projet, elles ont néanmoins constitué un apprentissage important. J’ai pris conscience qu’au-delà des aspects techniques et organisationnels, tout projet en entreprise évolue dans un écosystème humain traversé par des jeux d’influence, des rapports de pouvoir et des intérêts divergents. Cette réalité, parfois invisible mais bien réelle, fait partie intégrante du fonctionnement d’une grande organisation.</p>
+           </div>
+       </section>
+       
+        <section id="chapitre2" class="content-window">
+            <div class="window-header"><h2>// CHAPITRE 2: COMMUNICATION</h2></div>
+            <div class="window-body">
+                <h3>2.1. Bugs rencontrés : les freins à l’accès à l’information</h3>
+                <p>Tout système, même bien conçu, rencontre inévitablement des erreurs. Dans le cadre de mon stage, l’un des principaux “bugs” fut l’accès aux données. En effet, comme explicité précisément, le processus d’accès était extrêmement complexe, et ce, dû à la réticence du service data de me donner de réels accès ni même me révéler l’existence de Databricks, et ce, malgré les recommandations de mon tuteur. J’ai d’abord réussi à avoir un sample d’une base de données sous forme d’un document Excel que j’ai dû transposer à l’aide d’un compte personnel Databricks (lorsque l’on m’a communiqué son existence) afin de m’approcher d’une simulation réelle.</p>
+                <p>Ce processus, bien que compréhensible au regard des enjeux de confidentialité, rallongeait considérablement les délais, j’en ai perdu 2 semaines de travail intense en pensant gérer des bases de données sur Excel et non sur Databricks. Le temps consacré à la négociation des accès représentait presque autant d’efforts que le développement technique lui-même. </p>
+                <p>À cela s’ajoutaient d’autres “erreurs système” : l’absence d’un budget dédié à mon projet ne m’a pas permis d’utiliser des technologies bien plus avancées. Dans mon cas, j’avais deux principaux problèmes : j’ai naturellement été forcé d’utiliser des LLM locaux et donc de me priver d’API d’IA génératives dont l’efficacité et les capacités sont immensément plus importantes. Bien que la question de la confidentialité puisse se poser, j’ai fait des recherches quant aux contrats liant Cegid à Microsoft et OpenAI afin d’exposer cela à mon tuteur. Ce dernier m’a ainsi expliqué que ces contrats contenaient des clauses de confidentialité très poussées afin de protéger de potentielles données utilisées à travers l’utilisation de ces IA. C’est donc une piste d’amélioration de l’outil que j'expliquerai en conclusion de ce manuel.</p>
+                <h3>2.2. Protocoles de communication</h3>
+                <p>Pour corriger ou contourner ces bugs, il existait plusieurs protocoles de communication. Les plus fréquents étaient les multiples visioconférences quotidiennes. Elles constituaient l’équivalent d’un “canal prioritaire” permettant des échanges rapides et efficaces. Bien qu’étonné au départ de constater la rareté du présentiel, j’ai rapidement compris qu’il s’agissait d’une conséquence logique de l’organisation multi-sites de Cegid dans laquelle le distanciel devenait une nécessité. Ceci a été réellement développé à la suite de la pandémie de COVID-19, forçant au télétravail, devenu une pratique commune dorénavant dans l’entreprise.</p>
+                <p>En parallèle, la communication écrite (mails, comptes-rendus, partages de documents, création de diapositives de présentation,...) jouait un rôle essentiel par leur traçabilité et leur valeur juridique. Tout au long de mon stage, mon tuteur m’a demandé de rédiger différents documents dans ce but : le principal étant une expression de besoin qui était jointe aux nouvelles personnes impliquées de près ou de loin dans le projet afin d’affirmer la vision et les objectifs.</p>
+                <h3>2.3. Escalation process (validation hiérarchique)</h3>
+                <p>Dans un environnement logiciel, lorsqu’une erreur ne peut être corrigée au premier niveau, elle est “escaladée” vers un niveau supérieur. Chez Cegid, ce processus d’escalation était omniprésent :</p>
+                <ol>
+                    <li>Premier niveau : demande formulée directement par moi.</li>
+                    <li>Second niveau : appui du tuteur, servant de relais hiérarchique.</li>
+                    <li>Troisième niveau : attente d’approbation du service juridique, garant de la conformité.</li>
+                    <li>Quatrième niveau : validation par la data, condition ultime pour accéder à l’information.</li>
+                </ol>
+                <p>Ce schéma impliquait systématiquement plusieurs interlocuteurs, parfois situés sur des sites différents, et des délais conséquents. Les échanges par mail reflétaient cette réalité : il fallait inclure plusieurs personnes en copie pour assurer qu’aucune étape de validation ne soit oubliée.</p>
+                <p>Ce processus de hiérarchisation avait une double facette. ll agissait comme un pare-feu, dont je n’ai réussi qu’à entamer la troisième couche, garantissant que toute manipulation de données respectait le cadre légal et sécuritaire. Il fonctionnait néanmoins comme un ralentisseur qui freinait la productivité, bien que compréhensible au vu de mon statut de stagiaire.</p>
+                <h3>2.4. Analyse réflexive</h3>
+                <p>Ces expériences m’ont permis de mieux comprendre le rôle antinomique de la hiérarchie dans une grande entreprise. Elle peut être vue comme une protection par la sécurité qu’elle apporte aux projets, les erreurs coûteuses qu’elle évite et le cadre clair qu’elle impose. Néanmoins, elle représente également une contrainte, générant des lenteurs et un sentiment de rigidité parfois frustrant.</p>
+                <p>Cette réalité m’a confronté à un contraste saisissant : d’un côté, un outil d’intelligence artificielle conçu pour être rapide, souple et innovant, afin de promouvoir de la confiance; de l’autre, une organisation dont la structure hiérarchique tend à ralentir et complexifier les processus. L’efficacité potentielle de la technologie se heurte donc à la logique institutionnelle lorsque d’importantes décisions sont à prendre.</p>
+                <p>J’en retiens une leçon clé : au-delà du développement d’un outil ou de l’apprentissage de connaissance, savoir naviguer dans les circuits hiérarchiques constitue une compétence indispensable en entreprise. Identifier les bons interlocuteurs, oser prendre des initiatives, comprendre les chaînes de validation, se heurter au refus et adapter sa communication à chaque niveau sont autant de “bonnes pratiques” qui conditionnent la réussite d’un projet, au moins autant, si ce n’est plus que les compétences techniques.</p>
+            </div>
+        </section>
+        <section id="chapitre3" class="content-window">
+            <div class="window-header"><h2>// CHAPITRE 3: CULTURE</h2></div>
+            <div class="window-body">
+                <h3>3.1. Paramètres visibles : organisation et modes de travail</h3>
+                <p>Tout environnement logiciel dispose de paramètres qui définissent son fonctionnement. Chez Cegid, cela se traduit par l’organisation des espaces et des modes de travail. Les locaux de Boulogne sont vastes et structurés par étages selon les pôles (marketing, vente, finances, direction). Les open spaces favorisent la proximité immédiate, mais le fonctionnement multi-sites rend les interactions physiques marginales, standardisant l’utilisation de visioconférences.</p>
+                <p>Un autre aspect marquant fut la présence de liens hiérarchiques “en pointillés”. Contrairement aux organigrammes classiques où les rattachements sont linéaires, des mailles inter-pôles sont possibles, illustrant la complexité des décisions malgré la transversalité.</p>
+                <h3>3.2. Mode innovation : du “dinosaure” à l’intégration de l’IA</h3>
+                <p>Sur le marché, Cegid est parfois perçue comme un “dinosaure”, une entreprise historique, dépassé par Sage ou Pennylane. Pourtant, les annonces de la keynote et les initiatives autour de l’intelligence artificielle montrent une volonté claire de modernisation.</p>
+                <p>Mon projet s’inscrivait dans cette transition : utiliser l’IA pour faciliter les processus. Il m’a fait réfléchir à concilier deux logiques :</p>
+                <ul>
+                    <li>L’innovation, rapide, flexible, centrée sur l’utilisateur.</li>
+                    <li>L’entreprise historique, attachée à des procédures de validation longues et à une culture prudente.</li>
+                </ul>
+                <p>Cette tension entre héritage et modernisation constitue un élément clé de la période à laquelle je suis arrivé à Cegid : lancement de produits et restructuration tout en gardant une stabilité.</p>
+                <h3>3.3. Valeurs et culture vécues</h3>
+                <p>La culture d’une organisation ne se résume pas à des discours : elle se vit au quotidien. Chez Cegid, plusieurs éléments m’ont marqué.</p>
+                <p>D’une part, l’importance accordée aux événements collectifs, à l’image d’un afterwork rassemblant l’ensemble des pôles Sales fut organisé sur un week-end. Ceci contribue à renforcer la cohésion, à créer du lien entre collaborateurs et à cultiver un sentiment d’appartenance.</p>
+                <p>D’autre part, les échanges, même à distance, restaient fluides et ouverts. La diversité des profils avec lesquels j’ai interagi (data, juridique, marketing) reflétait une organisation où la transversalité est encouragée, même si elle nécessite des efforts constants de coordination.</p>
+                <p>Enfin, la dimension politique apparaissait également. Certains collaborateurs semblaient davantage orientés vers la gestion de leur image personnelle ou de leurs perspectives de carrière que vers l’avancement collectif. Cette réalité, bien qu’elle puisse ralentir certaines collaborations, constitue aussi une facette de la vie en entreprise à prendre en compte.</p>
+                <h3>3.4. Analyse réflexive</h3>
+                <p>L’exploration de ces paramètres culturels m’a permis de tirer plusieurs enseignements. D’abord, j’ai compris que la culture d’entreprise ne se réduit pas à une déclaration de valeurs : elle est incarnée par des pratiques quotidiennes, des modes de travail et des événements collectifs. Ensuite, j’ai constaté que l’innovation, même dans une entreprise perçue comme historique, peut émerger et se développer si elle est portée par une stratégie claire et des acteurs mobilisés.</p>
+                <p>Enfin, j’ai perçu l’importance de la cohésion et de la communication dans un contexte multi-sites. Sans ces paramètres, les processus seraient encore plus lents et complexes. La culture d’entreprise agit ainsi comme un système d’exploitation : elle définit les règles implicites qui orientent les comportements et conditionnent la performance collective.</p>
+            </div>
+        </section>
+        <section id="chapitre4" class="content-window">
+            <div class="window-header"><h2>// CHAPITRE 4: APPRENTISSAGES</h2></div>
+            <div class="window-body">
+                <h3>4.1. Compétences techniques déployées</h3>
+                <p>L’un des premiers apprentissages de ce stage fut d’ordre technique. Le projet m’a confronté à un environnement exigeant, où les outils et les méthodes devaient être rapidement maîtrisés, et ce par la courte durée de mon stage.</p>
+                <ul>
+                    <li>Codage et développement : j’ai approfondi mes connaissances en programmation développées à Télécom SudParis et celles en IA en concevant un outil basé sur cette technologie. L’intégration de ce moteur avec des bases de données clients a représenté un défi, que j’ai su relever en développant une architecture fonctionnelle et en respectant les contraintes de confidentialité.</li>
+                    <li>Databricks : la découverte tardive de cet outil fut d’abord un frein temporel, mais a constitué un atout de simplification majeur. J’ai appris à connecter mon projet via un système de token sécurisé, stocké dans un fichier dédié (.env). Cette compétence technique, nouvelle pour moi, illustre la capacité à m’adapter à un environnement inconnu et à en tirer parti.</li>
+                    <li>Design et prototypage : mes compétences initiales en design liées à mes apprentissages associatifs m’ont permis de proposer une interface claire pour mon outil, facilitant ainsi sa compréhension et sa mise en valeur. Cet aspect visuel, bien que secondaire, représente une vitrine qui a contribué à expliciter la vision du projet auprès de mes interlocuteurs.</li>
+                </ul>
+                <h3>4.2. Soft skills et apprentissages humains</h3>
+                <p>Au-delà de la technique, ce stage a surtout été un catalyseur de relations humaines et de comportements et démarches professionnels.</p>
+                <ul>
+                    <li>Communication interpersonnelle : j’ai dû apprendre à dialoguer avec des collaborateurs très différents (data scientists, juristes, FMM (Field Marketing Manager), PSM, …), chacun avec ses logiques, ses objectifs et ses contraintes. Cela m’a obligé à m’adapter à la personne afin de formuler mes demandes.</li>
+                    <li>Audace et proactivité : le fait de ne pas appartenir à une équipe fixe m’a poussé à oser aller vers les autres, à solliciter des rendez-vous et à insister parfois pour obtenir des réponses. Cette audace, que j’ai su développer, s’est révélée essentielle pour avancer dans le projet.</li>
+                    <li>Gestion de l’incertitude : l’arrivée tardive d’informations cruciales, les délais de validation, la courte durée du stage et les blocages m’ont appris à composer avec l’incertitude et à constamment chercher des solutions de repli.</li>
+                </ul>
+                <p>Ces compétences humaines me paraissent complémentaires aux compétences techniques: elles constituent un socle indispensable pour évoluer dans de grandes structures.</p>
+                <h3>4.3. Lien avec l’engagement associatif</h3>
+                <p>Ces apprentissages ont été facilités par de multiples expériences annexes développées dans mes engagements associatifs.</p>
+                <ul>
+                    <li>Communication et créativité : j’occupe différents postes dans la communication de certains clubs et associations, ainsi qu’être membre de clubs à but artistique (photo, vidéo, radio). J’ai appris à penser la communication textuelle et visuelle et acquis de l’expérience sur l’optimisation de l’efficacité de campagnes de communication. Cette expérience s’est révélée précieuse afin de développer la partie graphique de mon outil, par mes compétences mais aussi par l’expérience, afin d’optimiser l’ergonomie d’utilisation.</li>
+                    <li>Gestion de projet et leadership : mon rôle de vice-président d’INTv (club vidéo) m’a donné l’habitude de coordonner des projets complexes, avec des contraintes temporelles strictes, de répartir des tâches et de dialoguer avec des interlocuteurs variés. Ces compétences se sont directement transposées dans ma capacité à mener un projet transversal en entreprise.</li>
+                    <li>Technique et événementiel : mon engagement dans BPM (club sono) comme responsable lumières m’a familiarisé avec la technique et le besoin d’une rigueur absolue lors d’événements. Cette exigence de précision et de fiabilité se retrouve dans le développement d’un outil complexe comme celui que j’ai dû concevoir.</li>
+                    <li>Travail collectif et adaptabilité : mes activités au BDE m’ont appris à collaborer avec une équipe approchant les quarante personnes, à fédérer autour d’un objectif commun et à m’adapter rapidement aux imprévus. Ces compétences m’ont aidé à m’intégrer chez Cegid, malgré mon statut de stagiaire en autonomie.</li>
+                </ul>
+                <p>Ainsi, mes engagements associatifs ont eu le rôle de terrain d'entraînement dans des conditions très proches de la vie en entreprise: un espace où j’ai pu expérimenter, apprendre et me tromper avec des conséquences moins graves que dans le monde professionnel, au sein duquel j’ai transposé ces acquis.</p>
+                <h3>4.4. Analyse réflexive</h3>
+                <p>Ce stage m’a conforté dans l’idée qu’un ingénieur ne se définit pas seulement par sa maîtrise technique, mais aussi par sa capacité à comprendre et à interagir avec un environnement complexe.</p>
+                <p>Les “bugs” rencontrés m’ont appris la patience, la persévérance et l’importance de la légitimité hiérarchique. Les solutions que j’ai trouvées m’ont montré que la proactivité, l’audace et le soutien de personnes influentes peuvent débloquer des situations figées. Enfin, mes engagements associatifs m’ont permis d’anticiper et de développer des compétences que j’ai pu mobiliser dans ce contexte professionnel.</p>
+                <p>En somme, ce chapitre illustre que le meilleur manuel d’utilisation d’un futur ingénieur ne repose pas seulement sur des lignes de code, mais aussi sur des lignes d’expérience humaine et collective.</p>
+            </div>
+        </section>
+        <section id="conclusion" class="content-window">
+            <div class="window-header"><h2>// CONCLUSION: NEXT RELEASE</h2></div>
+            <div class="window-body">
+                <p>Au terme de ce stage d’un mois au sein de Cegid, le “logiciel stagiaire” que j’ai incarné a atteint une première version stable. Le déploiement de mon projet d’IA m’a permis de tester mes compétences, de corriger mes erreurs et d’installer de nouvelles fonctionnalités tout autant personnelles que professionnelles.</p>
+                <p>D’un point de vue technique, j’ai consolidé ma maîtrise du développement et de l’intégration d’outils basés sur l’IA. La découverte ainsi que l’adaptation aux multiples contraintes m’ont appris la rigueur et la précision nécessaires lorsque l’on manipule des données sensibles. Ces acquis représentent des briques solides pour mes futurs projets, tant académiques que professionnels.</p>
+                <p>Sur le plan humain, j’ai appris à naviguer dans un environnement hiérarchique complexe, où la circulation de l’information est encadrée par des processus multiples. J’ai compris que la réussite ne dépend pas uniquement de la qualité d’un outil, mais aussi de la capacité à identifier les bons interlocuteurs, à solliciter leur appui et à gagner leur confiance. Cette leçon restera pour moi un enseignement clé.</p>
+                <p>Mon engagement associatif a renforcé cette expérience : les responsabilités exercées dans mes clubs m’ont permis de développer des compétences en communication, en gestion de projet et en créativité, que j’ai su transposer dans un cadre professionnel. Ce parallèle illustre la continuité entre mes apprentissages personnels, associatifs et professionnels, et met en lumière l’importance d’expériences variées pour progresser.</p>
+                <p>En projection, les perspectives de la “version 2.0” de ce logiciel stagiaire sont claires : approfondir mes compétences en IA et en data, affiner mes capacités de gestion de projet, et continuer à cultiver l’audace et la curiosité nécessaires pour évoluer dans des environnements complexes. J’ai de plus écrit une note de fin de stage que j’ai adressé à mon tuteur, lui expliquant le déroulé du stage mais surtout les pistes d’amélioration du développement de l’outil avec des moyens plus poussés, preuve de la continuelle évolution de mon logiciel stagiaire.</p>
+                <p>Mon passage chez Cegid a été une mise à jour déterminante : j’ai amélioré mon système, identifié mes axes de développement et préparé le terrain pour les futures itérations de mon parcours.</p>
+                <p>Ainsi, ce RREX témoigne non seulement d’une expérience réussie, mais aussi d’un apprentissage pérenne des codes de l’entreprise.</p>
+            </div>
+        </section>
+        <section id="annexes" class="content-window">
+            <div class="window-header"><h2>// SYSTEM_LOGS: ANNEXES</h2></div>
+            <div class="window-body">
+                <h3>Entretien avec Léa Agosti – 31 juillet 2025</h3>
+                <blockquote>
+                    <p><strong>Samy B. :</strong> Je voulais que ce soit avec toi, vu qu’on a bien bossé ensemble, mais que ton domaine d’expertise reste loin du sujet pur de mon stage. Je pense que ça peut être bien. En fait, c’était juste des questions par rapport à la boîte et à son fonctionnement pour mon rapport de stage. Est-ce que tu pourrais me donner ton parcours et depuis quand tu es chez Cegid ?</p>
+                    <p><strong>Léa A. :</strong> Alors moi j’ai fait un double master marketing et management, en alternance. Je travaille dans le marketing depuis douze ans environ. Je suis chez Cegid depuis un peu plus de cinq ans maintenant. J’ai toujours travaillé dans le marketing, avant j’étais plutôt chef de produit export, et aujourd’hui je suis davantage sur l’opérationnel. Depuis six mois, je m’occupe de la prescription avec mon équipe.</p>
+                    <p><strong>Samy B. :</strong> Ok. Et du coup, ta fonction c’est Head of Campaign, mais concrètement qu’est-ce que tu appelles “prescription” ?</p>
+                    <p><strong>Léa A. :</strong> La prescription, c’est faire en sorte que des tiers recommandent tes solutions. C’est donc de la vente indirecte. Dans mon cas, on travaille beaucoup via les experts-comptables. [...] Enfin, un troisième canal, que l’on appelle “l’écosystème TPE”, regroupe toutes les institutions qui gravitent autour des petites entreprises [...].</p>
+                    <p><strong>Samy B. :</strong> D’accord. Et une journée type pour toi, ça ressemble à quoi ?</p>
+                    <p><strong>Léa A. :</strong> Franchement, il n’y a pas vraiment de journée type. [...] Le travail s’articule plutôt sur une année type : en fin d’année, on définit les budgets, objectifs et stratégies produits, puis à partir de janvier, on déploie tout cela sous forme de plan marketing [...].</p>
+                    <p><strong>Samy B. :</strong> Et si tu devais décrire la culture de Cegid, tu dirais quoi ?</p>
+                    <p><strong>Léa A. :</strong> C’est difficile. Je trouve que l’entreprise essaie de revenir sur le devant de la scène de l’innovation, mais on a été davantage suiveurs ces dernières années. Ce qui caractérise vraiment Cegid, ce sont les gens : c’est une force sous-estimée. [...]</p>
+                    <p><strong>Samy B. :</strong> Et côté santé et bien-être au travail ?</p>
+                    <p><strong>Léa A. :</strong> La prévention des risques physiques est bien couverte [...]. En revanche, les risques psychologiques (stress, burn-out) ne sont pas assez encadrés à mon sens, même si la bienveillance des collaborateurs compense beaucoup au quotidien.</p>
+                    <p><strong>Samy B. :</strong> Et ton bilan personnel ?</p>
+                    <p><strong>Léa A. :</strong> Ce que j’aime, c’est la diversité de mes missions : mon poste évolue régulièrement, je ne m’ennuie pas. [...] Un point faible selon moi, c’est qu’on sort parfois des produits pas assez finalisés, ce qui complique le travail marketing. Le produit reste la base : sans bon produit, même la meilleure communication ne suffit pas.</p>
+                </blockquote>
+                <h3>Entretien avec Gustave Beauvallet – 10 août 2025</h3>
+                <blockquote>
+                    <p><strong>Samy B. :</strong> Salut Gustave, merci d’avoir accepté. Comme tu sais, je fais mon rapport de stage et j’ai besoin de témoignages pour enrichir ma réflexion. Est-ce que tu pourrais commencer par te présenter rapidement ?</p>
+                    <p><strong>Gustave B. :</strong> Bien sûr. Je suis en deuxième année à Télécom SudParis et, à côté des cours, je me suis pas mal investi dans la vie associative. J’ai notamment été président de MiNET, l’association réseau de l’école. C’était une expérience assez intense [...].</p>
+                    <p><strong>Samy B. :</strong> Et niveau stage, tu avais fait quoi récemment ?</p>
+                    <p><strong>Gustave B. :</strong> Mon dernier stage était chez TheatreOnline. Le sujet, c’était : conception d’une application permettant d’extraire, structurer et résumer automatiquement des informations à partir de fichiers variés, puis de comparer les résultats produits par différentes IA [...].</p>
+                    <p><strong>Samy B. :</strong> Et sur le plan humain, qu’est-ce que tu en retiens ?</p>
+                    <p><strong>Gustave B. :</strong> La communication, clairement. Expliquer à des gens non techniques ce que tu fais et pourquoi c’est utile, c’est parfois plus dur que de coder. [...] Mon expérience associative m’a beaucoup aidé [...].</p>
+                    <p><strong>Samy B. :</strong> Tu vois donc un vrai lien entre ton asso et ton stage ?</p>
+                    <p><strong>Gustave B. :</strong> Complètement. Être président de MiNET, c’est comme gérer une petite entreprise [...]. Les deux m’ont appris à être clair, à rester pédagogue et à ne pas me cacher derrière du jargon technique.</p>
+                </blockquote>
+            </div>
+        </section>
+    </main>
+
+    <div id="chatbot-container"><div id="chat-log"></div><div class="chat-input-area"><span class="prompt">&gt;</span><input type="text" id="chat-input" placeholder="Entrez une commande (ex: aide)..." autocomplete="off"></div></div>
+
+    <script>
+         document.addEventListener('DOMContentLoaded', () => {
+            let isAudioInitialized = false;
+            const audio = { hum: document.getElementById('bg-hum'), typing: document.getElementById('typing-sound'), scroll: document.getElementById('scroll-sound'), confirm: document.getElementById('confirm-sound'), };
+            const bootText = document.getElementById('boot-text');
+            const bootScreen = document.getElementById('boot-screen');
+            const bootLines = ['INIT RREX KERNEL...', 'MOUNTING /dev/experience/cegid', '[OK] Memory check.', 'LOADING MODULES...', 'PARSING human_experience.log...', 'BOOT SEQUENCE COMPLETE.', 'LAUNCHING STAGE ASSISTANT v1.0...'];
+            let bootDelay = 250;
+            bootLines.forEach((line, index) => setTimeout(() => bootText.innerHTML += `<div class="boot-line" style="opacity:1">${'> ' + line}</div>`, index * bootDelay));
+            setTimeout(() => {
+                bootScreen.classList.add('hidden');
+                document.getElementById('chatbot-container').style.opacity = '1';
+                initChatbot();
+            }, bootLines.length * bootDelay + 500);
+
+            const chatLog = document.getElementById('chat-log');
+            const chatInput = document.getElementById('chat-input');
+            const navOptions = [ { name: 'Remerciements', id: '#remerciements' }, { name: 'Introduction', id: '#introduction' }, { name: 'Organisation', id: '#chapitre1' }, { name: 'Communication', id: '#chapitre2' }, { name: 'Culture', id: '#chapitre3' }, { name: 'Apprentissages', id: '#chapitre4' }, { name: 'Conclusion', id: '#conclusion' }, { name: 'Annexes', id: '#annexes' } ];
+            
+            const initChatbot = () => typeMessage("Stage Assistant v1.0 initialisé. Sélectionnez un module ou tapez 'aide'.", true);
+
+            const typeMessage = (text, showOptions = false, speed = 10) => {
+                const msgContainer = document.createElement('div');
+                msgContainer.className = 'chat-message bot-message';
+                chatLog.appendChild(msgContainer);
+                if(isAudioInitialized) { audio.typing.currentTime = 0; audio.typing.play(); }
+                let i = 0;
+                const interval = setInterval(() => {
+                    if (i < text.length) msgContainer.innerHTML += text.charAt(i++);
+                    else {
+                        clearInterval(interval);
+                        if(isAudioInitialized) audio.typing.pause();
+                        if (showOptions) addNavOptions();
+                    }
+                    chatLog.scrollTop = chatLog.scrollHeight;
+                }, speed);
+            };
+
+            const addNavOptions = () => {
+                const optionsContainer = document.createElement('div');
+                optionsContainer.className = 'chat-options';
+                navOptions.forEach(opt => optionsContainer.innerHTML += `<button class="chat-button" onclick="handleCommand('${opt.name}')">${opt.name}</button>`);
+                chatLog.lastChild.appendChild(optionsContainer);
+                chatLog.scrollTop = chatLog.scrollHeight;
+            };
+            
+            chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && chatInput.value.trim()) handleCommand(chatInput.value.trim()); });
+            
+            window.handleCommand = (command) => {
+                if (!isAudioInitialized) { try{ audio.hum.play(); isAudioInitialized = true; } catch(e){} }
+                const userInput = chatInput.value || command;
+                if (userInput) {
+                    const sanitizedInput = userInput.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    chatLog.innerHTML += `<div class="chat-message user-message">> ${sanitizedInput}</div>`;
+                }
+                chatInput.value = '';
+                chatLog.scrollTop = chatLog.scrollHeight;
+                processCommand(command.toLowerCase());
+            }
+
+            const qaPairs = { 'gregory desmot': "Grégory Desmot était mon tuteur de stage chez Cegid. Il a joué un rôle clé de 'super-admin' en m'apportant son soutien hiérarchique.", 'bug majeur': "Le 'bug' le plus bloquant fut l'accès aux données sensibles et à Databricks, qui a été retardé par de longs processus de validation.", 'qui es-tu': "Je suis Stage Assistant v1.0, une interface de RREX interactif documentant une expérience humaine chez Cegid.", 'tuteur': "Mon tuteur de stage était Grégory Desmot." };
+
+            function processCommand(cmd) {
+                if(isAudioInitialized) try{audio.confirm.play();} catch(e){}
+                const qaMatch = Object.keys(qaPairs).find(key => cmd.includes(key));
+                if (qaMatch) { typeMessage(qaPairs[qaMatch], true); return; }
+                const navMatch = navOptions.find(opt => cmd.includes(opt.name.toLowerCase()));
+                if (navMatch) {
+                    typeMessage(`Commande reçue. Chargement du module [${navMatch.name}]...`, false);
+                    if(isAudioInitialized) try{audio.scroll.play();} catch(e){}
+                    document.querySelector(navMatch.id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setTimeout(() => typeMessage("Système prêt.", true), 1000);
+                    return;
+                }
+                if (cmd.startsWith('search ')) { handleSearch(cmd.substring(7)); return; }
+                if (cmd.startsWith('theme ')) { handleTheme(cmd.substring(6)); return; }
+                switch (cmd) {
+                    case 'aide': case 'help': case 'commandes': typeMessage("Commandes : " + navOptions.map(o => o.name).join(', ') + ", search [terme], scan skills, theme [glitch/stealth/reset], matrix, clear, exit.", true); break;
+                    case 'scan skills':
+                        const skills = ["> SCANNING CORE...", "> ANALYSIS COMPLETE:", "> [TECH] IA & Développement ........... [MAÎTRISÉ]", "> [TECH] Databricks & API .............. [ACQUIS]", "> [TECH] Design & Prototypage .......... [APPLIQUÉ]", "> ", "> [HUMAIN] Communication Interpersonnelle ... [RENFORCÉ]", "> [HUMAIN] Audace & Proactivité ......... [DÉVELOPPÉ]", "> [HUMAIN] Gestion de l'Incertitude .... [AMÉLIORÉ]"];
+                        let i = 0; function show() { if (i < skills.length) { chatLog.innerHTML += `<div class="chat-message bot-message">${skills[i]}</div>`; chatLog.scrollTop = chatLog.scrollHeight; i++; setTimeout(show, 100); } else { setTimeout(() => typeMessage("Système prêt.", true), 500); } } show();
+                        break;
+                    case 'matrix': startMatrixRain(); typeMessage("Activation du mode Matrix... Déconnexion dans 10s.", true); break;
+                    case 'clear': case 'cls': chatLog.innerHTML = ''; initChatbot(); break;
+                    case 'exit': typeMessage("Merci d'avoir exploré cette expérience. Arrêt du système...", false); setTimeout(() => document.body.style.opacity = '0', 1500); break;
+                    default: typeMessage("Commande non reconnue. Tapez 'aide' pour la liste des commandes.", true);
+                }
+            }
+            
+            function removeHighlights() { const h = document.querySelectorAll('.highlight'); h.forEach(el => { const p = el.parentNode; p.replaceChild(document.createTextNode(el.textContent), el); p.normalize(); }); }
+            function handleSearch(term) {
+                removeHighlights();
+                if (!term) { typeMessage("Usage: search [terme]", true); return; }
+                const regex = new RegExp(term.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi'); let count = 0; const sections = new Set();
+                document.querySelectorAll('.content-window .window-body').forEach(section => { const matches = section.innerHTML.match(regex); if(matches) { count += matches.length; sections.add(section.closest('.content-window').querySelector('h2').textContent.replace('//', '').trim()); } section.innerHTML = section.innerHTML.replace(regex, `<span class="highlight">${term}</span>`); });
+                if (count > 0) { typeMessage(`Recherche de "${term}"... ${count} résultat(s) trouvé(s) dans : [${Array.from(sections).join(', ')}].`, true); document.querySelector('.highlight')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } else { typeMessage(`Aucun résultat pour "${term}".`, true); }
+            }
+            function handleTheme(theme) { document.body.classList.remove('theme-glitch', 'theme-stealth'); if (theme === 'glitch' || theme === 'stealth') { document.body.classList.add(`theme-${theme}`); typeMessage(`Thème '${theme}' activé.`, true); } else { typeMessage('Thème par défaut restauré.', true); } }
+            function startMatrixRain() {
+                const canvas = document.getElementById('matrix-canvas'); const ctx = canvas.getContext('2d');
+                canvas.style.display = 'block'; canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+                const letters = 'CEGIDRREX01'; const fontSize = 16; const columns = canvas.width / fontSize;
+                const drops = Array(Math.floor(columns)).fill(1);
+                function draw() {
+                    ctx.fillStyle = 'rgba(2, 4, 18, 0.05)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#0F0'; ctx.font = `${fontSize}px monospace`;
+                    for (let i = 0; i < drops.length; i++) {
+                        const text = letters[Math.floor(Math.random() * letters.length)];
+                        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                        drops[i]++;
+                    }
+                }
+                const interval = setInterval(draw, 33);
+                setTimeout(() => { clearInterval(interval); canvas.style.display = 'none'; }, 10000);
+            }
+        });
+    </script>
+</body>
+</html>
